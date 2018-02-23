@@ -1,0 +1,5 @@
+example command:
+
+`python3 mysqlbackup.py` ... log is outputted to standard out. log level is INFO.
+`python3 mysqlbackup.py --loglevel 30 --handler file` ... log is outputted to file in current directory.
+ log level is WARNING.

@@ -1,0 +1,15 @@
+{
+  "default_path": {
+    "_comment": "directory path to use backup script.",
+    "BK_ROOT": "/data2/backup/",
+    "CONFIG_PATH": "/usr/local/etc/daily_backup/config/backup.json"
+  },
+  "mysql": {
+    "_comment": "necessary account information when connecting to mysql.",
+    "MYSQL_USER": "root",
+    "MYSQL_PASSWORD": "zLKr2F6rwT1k5xJ!",
+    "MYSQL_DB": "mysql",
+    "MYSQL_HOST": "localhost",
+    "MYSQL_PORT": "13306"
+  }
+}
