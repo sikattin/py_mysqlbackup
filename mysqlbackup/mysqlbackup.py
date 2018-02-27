@@ -263,7 +263,7 @@ class MySQLBackup(object):
                 # -R オプションははずして、ループの外でSPのみを出力するmysqldumpを実行する.
                 # mysqqldump -u{} -p{} --routines --no-data --no-create-info {db} > {dump}
                 mysqldump_cmd = (
-                                "mysqldump -u{0} -p{1} -q --skip-opt -R {2} {3} > "
+                                "mysqldump -u{0} -p{1} -q --skip-opt {2} {3} > "
                                 "{4}".format(self.myuser,
                                              self._decrypt_string(self.mypass),
                                              db,
@@ -272,7 +272,14 @@ class MySQLBackup(object):
                                 )
                 split_cmd = mysqldump_cmd.split()
                 cmds += (split_cmd,)
-
+            # get a dump only SP.
+            spdump_path = "{0}/{1}_{2}SP.sql".format(self.bk_dir, self.ymd, db)
+            mysqldump_sp = "mysqldump -u{0} -p{1} --routines --no-data " \
+                           "--no-create-info {2} > {3}".format(self.myuser,
+                                                               self._decrypt_string(self.mypass),
+                                                               db,
+                                                               spdump_path)
+            cmds += (mysqldump_sp.split(),)
         return cmds
 
     def do_backup(self, exc_cmds: tuple):
