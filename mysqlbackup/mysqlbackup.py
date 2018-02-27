@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 #-------------------------------------------------------------------------------
 # Name:        mysqlbackup.py
 # Purpose:     MySQL backup script.
@@ -18,23 +19,23 @@ from datetime_skt.datetime_orig import dateArithmetic
 from osfile import fileope
 # logger
 from mylogger import logger
-from mylogger.factory import StdoutLoggerFactory, \
-                             FileLoggerFactory, \
+from mylogger.factory import StdoutLoggerFactory, FileLoggerFactory
 # read/write operation to file
 from iomod import rwfile
 # python standard modules
+from os.path import split
 import subprocess
 import time
 
 # base log file name.
 LOGFILE = 'mariadb_backup.log'
 # config file name.
-# default config file path is <python lib>/dist|site-packages/daily_backup/config
+# default config file path is <python lib>/dist|site-packages/mysqlbackup/config
 CONFIG_FILE = 'backup.json'
 INST_DIR = ''
 CONFIG_PATH = ''
 
-class localBackup(object):
+class MySQLBackup(object):
     """
     """
 
@@ -72,16 +73,17 @@ class localBackup(object):
         self.ym = "{0}{1}".format(self.year, self.month)
         self.md = "{0}{1}".format(self.month, self.day)
         self.ymd = "{0}{1}{2}".format(self.year, self.month, self.day)
-        self.bk_dir = "{0}{1}/{2}".format(self.bk_root, self.ym, self.md)
+        self.ymdhm = self.date_arith.get_now_full()
+        self.bk_dir = "{0}mysqlbackup_{1}".format(self.bk_root, self.ymdhm)
 
         return self
 
     def _get_pylibdir(self):
-            import daily_backup
+            import mysqlbackup
 
             global INST_DIR, CONFIG_PATH
-            INST_DIR = daily_backup.__path__
-            CONFIG_PATH = "{0}/config/{1}".format(INST_DIR[0], CONFIG_FILE)
+            INST_DIR = split(mysqlbackup.__file__)[0]
+            CONFIG_PATH = "{0}/config/{1}".format(INST_DIR, CONFIG_FILE)
 
     def _load_json(self):
         """jsonファイルをパースする."""
@@ -91,7 +93,6 @@ class localBackup(object):
         """パースしたJSONオブジェクトから必要なデータを変数にセットする."""
         # PATH
         self.bk_root = self.parsed_json['default_path']['BK_ROOT']
-        self.config_path = self.parsed_json['default_path']['CONFIG_PATH']
 
         # MYSQL
         self.myuser = self.parsed_json['mysql']['MYSQL_USER']
@@ -259,6 +260,8 @@ class localBackup(object):
                                                            db,
                                                            self.ymd,
                                                            table)
+                # -R オプションははずして、ループの外でSPのみを出力するmysqldumpを実行する.
+                # mysqqldump -u{} -p{} --routines --no-data --no-create-info {db} > {dump}
                 mysqldump_cmd = (
                                 "mysqldump -u{0} -p{1} -q --skip-opt -R {2} {3} > "
                                 "{4}".format(self.myuser,
@@ -358,11 +361,13 @@ class localBackup(object):
 
 if __name__ == '__main__':
     import argparse
+    import mysqlbackup
 
-    with open('README') as f:
+    lib_dir = split(mysqlbackup.__file__)[0]
+    with open(fileope.join_path(lib_dir, 'README')) as f:
         description = f.read()
 
-    with open('EPILOG') as file:
+    with open(fileope.join_path(lib_dir, 'EPILOG')) as file:
         epilog = file.read()
 
     argparser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -379,7 +384,7 @@ if __name__ == '__main__':
                                  "available value is 'file' | 'console'")
     args = argparser.parse_args()
 
-    db_backup = localBackup(loglevel=args.loglevel, handler=args.handler)
+    db_backup = MySQLBackup(loglevel=args.loglevel, handler=args.handler)
     db_backup.main()
     # logger close
     db_backup._logger.close()
