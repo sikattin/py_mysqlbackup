@@ -39,8 +39,9 @@ class MySQLBackup(object):
     """
     """
 
-    def __new__(cls, loglevel=None, handler=None):
+    def __new__(cls, password, loglevel=None, handler=None):
         self = super().__new__(cls)
+        self.mypass = password
         # JSONファイルから各種データの読み込み、インスタンス変数にセット.
         self.parsed_json = {}
         self._get_pylibdir()
@@ -111,43 +112,50 @@ class MySQLBackup(object):
         """旧バックアップデータを削除する.
 
         Args:
-            param1 preserved_day: バックアップを保存しておく日数. デフォルトは3日
+            param1 preserved_day: バックアップを保存しておく日数. デフォルトは5日
                 type: int
         """
         if preserved_day is None:
-            preserved_day = 3
+            preserved_day = 5
         # バックアップルートにあるディレクトリ名一覧を取得する.
         dir_names = fileope.get_dir_names(dir_path=self.bk_root)
         if len(dir_names) == 0:
             return
         for dir_name in dir_names:
             # バックアップ用ディレクトリ以外は除外.
-            if not self.rwfile.is_matched(line=dir_name, search_objs=['^[0-9]{6}$']):
+            if not self.rwfile.is_matched(line=dir_name, search_objs=['^mysqlbackup_[0-9]{12}$']):
                 continue
-            # 日毎のバックアップディレクトリ名一覧の取得.
-            monthly_bkdir = "{0}{1}".format(self.bk_root, dir_name)
-            daily_bkdirs = fileope.get_dir_names(dir_path=monthly_bkdir)
-            # 日毎のバックアップディレクトリがひとつも存在しない場合は
-            # 月毎のバックアップディレクトリ自体を削除する.
-            if len(daily_bkdirs) == 0:
-                fileope.remove_dir(monthly_bkdir)
-                continue
-            for daily_bkdir in daily_bkdirs:
-                # 現在の日付と対象となるディレクトリのタイムスタンプの日数差を計算する.
-                backup_dir = "{0}/{1}".format(monthly_bkdir, daily_bkdir)
-                sub_days = self.date_arith.subtract_target_from_now(backup_dir)
-                self._logger.debug("sub_days = {}".format(sub_days))
-                    # 作成されてから3日以上経過しているバックアップディレクトリを削除する.
-                if sub_days >= preserved_day:
+            # 現在の日付と対象となるディレクトリのタイムスタンプの日数差を計算する.
+            backup_dir = fileope.join_path(self.bk_root, dir_name)
+            sub_days = self.date_arith.subtract_target_from_now(backup_dir)
+            self._logger.debug("sub_days = {}".format(sub_days))
+                # 作成されてから5日以上経過しているバックアップディレクトリを削除する.
+            if sub_days >= preserved_day:
+                print("--- Detected old dump files ---")
+                print("Are you sure to delete this dump files? -> {}".format(backup_dir))
+                while True:
                     try:
-                        fileope.f_remove_dirs(path=backup_dir)
-                    except OSError as e:
-                        error = "raise error! failed to trying remove {}".format(backup_dir)
-                        self._logger.error(error)
-                        raise e
+                        raw = input("Yes | No: ")
+                    except ValueError:
+                        print("a invalid value. please input a valid value.")
+                        continue
                     else:
-                        stdout = "remove old dump files: {}".format(backup_dir)
-                        self._logger.info(stdout)
+                        if raw.lower() == 'yes':
+                            try:
+                                fileope.f_remove_dirs(path=backup_dir)
+                            except OSError as e:
+                                error = "raise error! failed to trying remove {}".format(backup_dir)
+                                self._logger.error(error)
+                                raise e
+                            else:
+                                stdout = "remove old dump files: {}".format(backup_dir)
+                                self._logger.info(stdout)
+                                break
+                        elif raw.lower() == 'no':
+                            break
+                        else:
+                            print("a invalid value. please input Yes or No")
+                            continue
 
     ''' ログローテーション機能はLoggerモジュールで実装したためこれはさようなら
 
@@ -219,7 +227,7 @@ class MySQLBackup(object):
         with MySQLDB(host=self.myhost,
                      dst_db=self.mydb,
                      myuser=self.myuser,
-                     mypass=self._decrypt_string(self.mypass),
+                     mypass=self.mypass,
                      port=self.myport) as mysqldb:
             # SHOW DATABASES;
             self._logger.info("Database names now acquireing...")
@@ -263,9 +271,10 @@ class MySQLBackup(object):
                 # -R オプションははずして、ループの外でSPのみを出力するmysqldumpを実行する.
                 # mysqqldump -u{} -p{} --routines --no-data --no-create-info {db} > {dump}
                 mysqldump_cmd = (
-                                "mysqldump -u{0} -p{1} -q --skip-opt {2} {3} > "
+                                "mysqldump -u{0} -p{1} -q --skip-add-locks " \
+                                "--skip-disable-keys --skip-lock-tables {2} {3} > " \
                                 "{4}".format(self.myuser,
-                                             self._decrypt_string(self.mypass),
+                                             self.mypass,
                                              db,
                                              table,
                                              output_path)
@@ -274,9 +283,10 @@ class MySQLBackup(object):
                 cmds += (split_cmd,)
             # get a dump only SP.
             spdump_path = "{0}/{1}_{2}SP.sql".format(self.bk_dir, self.ymd, db)
-            mysqldump_sp = "mysqldump -u{0} -p{1} --routines --no-data " \
-                           "--no-create-info {2} > {3}".format(self.myuser,
-                                                               self._decrypt_string(self.mypass),
+            mysqldump_sp = "mysqldump -u{0} -p{1} -q --routines --no-data " \
+                           "--no-create-info --skip-add-locks --skip-disable-keys " \
+                           "--skip-lock-tables {2} > {3}".format(self.myuser,
+                                                               self.mypass,
                                                                db,
                                                                spdump_path)
             cmds += (mysqldump_sp.split(),)
@@ -356,7 +366,7 @@ class MySQLBackup(object):
         # mysqldumpの実行.
         self.do_backup(commands)
         # 圧縮処理
-        self.compress_backup()
+#        self.compress_backup()
 
         elapsed_time = time.time() - start
         line = "elapsed time is {0} sec. {1} finished.".format(elapsed_time, __file__)
@@ -391,7 +401,9 @@ if __name__ == '__main__':
                                  "available value is 'file' | 'console'")
     args = argparser.parse_args()
 
-    db_backup = MySQLBackup(loglevel=args.loglevel, handler=args.handler)
+    password = getpass("Password for DB authentication: ")
+
+    db_backup = MySQLBackup(password=password, loglevel=args.loglevel, handler=args.handler)
     db_backup.main()
     # logger close
     db_backup._logger.close()
