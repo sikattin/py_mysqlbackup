@@ -22,7 +22,7 @@ description = 'MySQL Backup Script.\n' \
 
 setup(
     name='mysqlbackup',
-    version='1.0',
+    version='1.1',
     description=description,
     long_description=readme,
     author='Takeki Shikano',

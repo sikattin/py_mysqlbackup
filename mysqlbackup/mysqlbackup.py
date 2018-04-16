@@ -23,7 +23,7 @@ from mylogger.factory import StdoutLoggerFactory, FileLoggerFactory
 # read/write operation to file
 from iomod import rwfile
 # python standard modules
-from os.path import split
+from os.path import split, join
 import subprocess
 import time
 
@@ -75,7 +75,8 @@ class MySQLBackup(object):
         self.md = "{0}{1}".format(self.month, self.day)
         self.ymd = "{0}{1}{2}".format(self.year, self.month, self.day)
         self.ymdhm = self.date_arith.get_now_full()
-        self.bk_dir = "{0}mysqlbackup_{1}".format(self.bk_root, self.ymdhm)
+        bkdir_name = "mysqlbackup_{}".format(self.ymdhm)
+        self.bk_dir = join(self.bk_root, bkdir_name)
 
         return self
 
@@ -97,7 +98,6 @@ class MySQLBackup(object):
 
         # MYSQL
         self.myuser = self.parsed_json['mysql']['MYSQL_USER']
-        self.mypass = self.parsed_json['mysql']['MYSQL_PASSWORD']
         self.mydb = self.parsed_json['mysql']['MYSQL_DB']
         self.myhost = self.parsed_json['mysql']['MYSQL_HOST']
         self.myport = self.parsed_json['mysql']['MYSQL_PORT']
@@ -271,7 +271,7 @@ class MySQLBackup(object):
                 # -R オプションははずして、ループの外でSPのみを出力するmysqldumpを実行する.
                 # mysqqldump -u{} -p{} --routines --no-data --no-create-info {db} > {dump}
                 mysqldump_cmd = (
-                                "mysqldump -u{0} -p{1} -q --skip-add-locks " \
+                                "mysqldump -u{0} -p'{1}' -q --skip-add-locks " \
                                 "--skip-disable-keys --skip-lock-tables {2} {3} > " \
                                 "{4}".format(self.myuser,
                                              self.mypass,
@@ -283,7 +283,7 @@ class MySQLBackup(object):
                 cmds += (split_cmd,)
             # get a dump only SP.
             spdump_path = "{0}/{1}_{2}SP.sql".format(self.bk_dir, self.ymd, db)
-            mysqldump_sp = "mysqldump -u{0} -p{1} -q --routines --no-data " \
+            mysqldump_sp = "mysqldump -u{0} -p'{1}' -q --routines --no-data " \
                            "--no-create-info --skip-add-locks --skip-disable-keys " \
                            "--skip-lock-tables {2} > {3}".format(self.myuser,
                                                                self.mypass,
@@ -379,6 +379,7 @@ class MySQLBackup(object):
 if __name__ == '__main__':
     import argparse
     import mysqlbackup
+    from getpass import getpass
 
     lib_dir = split(mysqlbackup.__file__)[0]
     with open(fileope.join_path(lib_dir, 'README')) as f:
