@@ -26,7 +26,17 @@ from iomod import rwfile
 from os.path import split, join
 import subprocess
 import time
+import shlex
 
+# chown
+BIN_CHOWN = '/bin/chown'
+OPT_CHOWN = '-R mysql:mysql'
+# mysqldump
+DUMP_SP_OPTS = '--quote-names --routines --events --no-data --no-create-info'
+FULLDUMP_OPTS = "--fields-terminated-by=, " \
+                "--quote-names " \
+                "--skip-lock-tables " \
+                "--single-transaction"
 # base log file name.
 LOGFILE = 'mariadb_backup.log'
 # config file name.
@@ -39,10 +49,12 @@ class MySQLBackup(object):
     """
     """
 
-    def __new__(cls, password, loglevel=None, handler=None):
+    def __new__(cls, password, loglevel=None, handler=None, no_comp=False):
         self = super().__new__(cls)
         self.mypass = password
         # JSONファイルから各種データの読み込み、インスタンス変数にセット.
+        self.no_comp = no_comp
+
         self.parsed_json = {}
         self._get_pylibdir()
         self.rwfile = rwfile.RWFile()
@@ -119,6 +131,7 @@ class MySQLBackup(object):
             preserved_day = 5
         # バックアップルートにあるディレクトリ名一覧を取得する.
         dir_names = fileope.get_dir_names(dir_path=self.bk_root)
+        dir_names.sort()
         if len(dir_names) == 0:
             return
         for dir_name in dir_names:
@@ -250,6 +263,18 @@ class MySQLBackup(object):
         self._logger.info("succeeded acquireing database names.")
         return results
 
+    def _change_owner(self):
+        try:
+            subprocess.check_call(shlex.split("{0} {1} {2}".format(BIN_CHOWN,
+                                                                   OPT_CHOWN,
+                                                                   self.bk_dir)))
+        except subprocess.CalledProcessError as e:
+            error = "an error occured during execution of following command.\n{}".format(e.cmd)
+            self._logger.error(error)
+        else:
+            self._logger.info("Change owner to mysql {}".format(self.bk_dir))
+
+
     def mk_cmd(self, params):
         """実行するLinuxコマンドを成形する.
 
@@ -311,7 +336,8 @@ class MySQLBackup(object):
                 error = "an error occured during execution of following command.\n{}".format(e.cmd)
                 self._logger.error(error)
             else:
-                stdout = "mysqldump succeeded. dumpfile is saved {}".format(exc_cmd[len(exc_cmd) - 1])
+                stdout = "mysqldump succeeded. dumpfile is saved to {}"
+                         .format(exc_cmd[len(exc_cmd) - 1]))
                 self._logger.info(stdout)
         self._logger.info("complete backup process.")
 
@@ -354,6 +380,8 @@ class MySQLBackup(object):
         start = time.time()
         # バックアップ用ディレクトリの作成.
         self._mk_backupdir()
+        # 所有者の変更
+        self._change_owner()
         # 旧バックアップデータの削除.
         self._remove_old_backup()
         # ログファイルの削除.
@@ -366,7 +394,8 @@ class MySQLBackup(object):
         # mysqldumpの実行.
         self.do_backup(commands)
         # 圧縮処理
-#        self.compress_backup()
+        if not self.no_comp:
+            self.compress_backup()
 
         elapsed_time = time.time() - start
         line = "elapsed time is {0} sec. {1} finished.".format(elapsed_time, __file__)
@@ -400,11 +429,18 @@ if __name__ == '__main__':
                            help="settings the handler of log outputed.\n" \
                                 "default handler is 'console'. log is outputed in standard out.\n" \
                                  "available value is 'file' | 'console'")
+    argparser.add_argument('--no_compress',
+                           action='store_true',
+                           required=False,
+                           help='not compress the db dump files')
     args = argparser.parse_args()
 
     password = getpass("Password for DB authentication: ")
 
-    db_backup = MySQLBackup(password=password, loglevel=args.loglevel, handler=args.handler)
+    db_backup = MySQLBackup(password=password,
+                            loglevel=args.loglevel,
+                            handler=args.handler,
+                            no_comp=args.no_compress)
     db_backup.main()
     # logger close
     db_backup._logger.close()
