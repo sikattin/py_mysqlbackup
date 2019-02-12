@@ -336,8 +336,8 @@ class MySQLBackup(object):
                 error = "an error occured during execution of following command.\n{}".format(e.cmd)
                 self._logger.error(error)
             else:
-                stdout = "mysqldump succeeded. dumpfile is saved to {}"
-                         .format(exc_cmd[len(exc_cmd) - 1]))
+                stdout = "mysqldump succeeded. dumpfile is saved to {}".format(
+                         exc_cmd[len(exc_cmd) - 1])
                 self._logger.info(stdout)
         self._logger.info("complete backup process.")
 
