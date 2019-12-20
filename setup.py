@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-# Learn more: https://github.com/kennethreitz/setup.py
 
 from setuptools import setup, find_packages
 
@@ -26,7 +25,7 @@ setup(
     description=description,
     long_description=readme,
     author='Takeki Shikano',
-    author_email='shikano.takeki@nexon.co.jp',
+    author_email='',
     url=None,
     license='MIT',
     packages=find_packages(exclude=('tests', 'docs')),
