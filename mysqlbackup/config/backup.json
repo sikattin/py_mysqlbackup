@@ -2,7 +2,7 @@
   "default_path": {
     "_comment": "directory path to use backup script.",
     "BK_ROOT": "/data2/backup/",
-    "KEY_PATH": "/home/Nxj_ToS_TS1/.ssh/id_rsa",
+    "KEY_PATH": "/home/user/.ssh/id_rsa",
     "CRED_PATH": "/usr/local/lib/python3.4/dist-packages/mysqlbackup/config/credential.enc"
   },
   "mysql": {
